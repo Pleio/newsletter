@@ -13,7 +13,7 @@
  * @return void
  */
 function newsletter_start_commandline_sending(Newsletter $entity) {
-	
+
 	if (!empty($entity) && elgg_instanceof($entity, "object", Newsletter::SUBTYPE)) {
 		// prepare commandline settings
 		$settings = array(
@@ -25,18 +25,22 @@ function newsletter_start_commandline_sending(Newsletter $entity) {
 		if (isset($_SERVER["HTTPS"])) {
 			$settings["https"] = $_SERVER["HTTPS"];
 		}
-		
+
 		// which script to run
 		$script_location = dirname(dirname(__FILE__)) . "/procedures/cli.php";
-		
+
 		// convert settings to commandline params
 		$query_string = http_build_query($settings, "", " ");
-		
-		// start the correct commandline
-		if (PHP_OS === "WINNT") {
-			pclose(popen("start /B php " . $script_location . " " . $query_string, "r"));
+
+		if (elgg_is_active_plugin("pleio")) {
+			pleio_schedule_in_background("newsletter_process", $entity->guid);
 		} else {
-			exec("php " . $script_location . " " . $query_string . " > /dev/null &");
+			// start the correct commandline
+			if (PHP_OS === "WINNT") {
+				pclose(popen("start /B php " . $script_location . " " . $query_string, "r"));
+			} else {
+				exec("php " . $script_location . " " . $query_string . " > /dev/null &");
+			}
 		}
 	}
 }
