@@ -54,15 +54,15 @@ function newsletter_start_commandline_sending(Newsletter $entity) {
  */
 function newsletter_generate_commanline_secret($entity_guid) {
 	$result = false;
-	
+
 	$entity_guid = sanitise_int($entity_guid, false);
-	
+
 	if (!empty($entity_guid)) {
 		$plugin = elgg_get_plugin_from_id("newsletter");
-		
+
 		$result = hash_hmac("sha256", ($plugin->getGUID() . "|" . $entity_guid . "|" . $plugin->time_created), get_site_secret());
 	}
-	
+
 	return $result;
 }
 
@@ -76,17 +76,17 @@ function newsletter_generate_commanline_secret($entity_guid) {
  */
 function newsletter_validate_commandline_secret($entity_guid, $secret) {
 	$result = false;
-	
+
 	$entity_guid = sanitise_int($entity_guid, false);
-	
+
 	if (!empty($entity_guid) && !empty($secret)) {
 		$correct_secret = newsletter_generate_commanline_secret($entity_guid);
-		
+
 		if (!empty($correct_secret) && ($correct_secret === $secret)) {
 			$result = true;
 		}
 	}
-	
+
 	return $result;
 }
 
@@ -98,30 +98,30 @@ function newsletter_validate_commandline_secret($entity_guid, $secret) {
  * @return void
  */
 function newsletter_process($entity_guid) {
-	
+
 	$entity_guid = sanitise_int($entity_guid, false);
-	
+
 	if (!empty($entity_guid)) {
 		// ignore access
 		$ia = elgg_set_ignore_access(true);
-		
+
 		$entity = get_entity($entity_guid);
 		// is this a Newsletter
 		if (!empty($entity) && elgg_instanceof($entity, "object", Newsletter::SUBTYPE)) {
 			$logging = array(
 				"start_time" => time()
 			);
-			
+
 			$site = elgg_get_site_entity();
 			$container = $entity->getContainerEntity();
 			$dbprefix = elgg_get_config("dbprefix");
-			
+
 			// ================================
 			// set newsletter status to sending
 			// ================================
 			$entity->status = "sending";
 			$entity->start_time = $logging["start_time"];
-			
+
 			// ==================
 			// get the recipients
 			// ==================
@@ -158,7 +158,7 @@ function newsletter_process($entity_guid) {
 					)"
 				);
 			}
-			
+
 			$filtered_recipients = array(
 				"users" => array(),
 				"emails" => array()
@@ -167,10 +167,10 @@ function newsletter_process($entity_guid) {
 			if (empty($recipients)) {
 				// no recipients so report error
 				$entity->status = "sent";
-				
+
 				return false;
 			}
-			
+
 			// recipients is an array consisting of:
 			// - user_guids: 	individual users
 			// - group_guids:	groups to send the content to
@@ -182,11 +182,11 @@ function newsletter_process($entity_guid) {
 				if (!is_array($user_guids)) {
 					$user_guids = array($user_guids);
 				}
-				
+
 				// convert to a format we can use
 				$options = $basic_user_options;
 				$options["wheres"][] = "(e.guid IN (" . implode(",", $user_guids) . "))";
-				
+
 				$users = elgg_get_entities($options);
 				if (!empty($users)) {
 					$new_users = array();
@@ -196,17 +196,17 @@ function newsletter_process($entity_guid) {
 					$filtered_recipients["users"] += $new_users;
 				}
 			}
-			
+
 			$group_guids = elgg_extract("group_guids", $recipients);
 			if (!empty($group_guids)) {
 				if (!is_array($group_guids)) {
 					$group_guids = array($group_guids);
 				}
-				
+
 				$options = $basic_user_options;
 				$options["joins"][] = "JOIN " . $dbprefix . "entity_relationships r ON e.guid = r.guid_one";
 				$options["wheres"][] = "(r.guid_two IN (" . implode(",", $group_guids) . ") AND r.relationship = 'member')";
-				
+
 				$users = elgg_get_entities($options);
 				if (!empty($users)) {
 					$new_users = array();
@@ -216,27 +216,27 @@ function newsletter_process($entity_guid) {
 					$filtered_recipients["users"] += $new_users;
 				}
 			}
-			
+
 			$subscribers = elgg_extract("subscribers", $recipients);
 			if (!empty($subscribers)) {
 				$subscribers = newsletter_get_subscribers($container);
-				
+
 				$filtered_recipients["users"] += $subscribers["users"];
 				$filtered_recipients["emails"] = array_merge($filtered_recipients["emails"], $subscribers["emails"]);
 			}
-			
+
 			$members = elgg_extract("members", $recipients);
 			if (!empty($members)) {
 				$relationship = "member";
 				if (elgg_instanceof($container, "site")) {
 					$relationship = "member_of_site";
 				}
-				
+
 				$options = $basic_user_options;
 				$options["relationship"] = $relationship;
 				$options["relationship_guid"] = $container->getGUID();
 				$options["inverse_relationship"] = true;
-				
+
 				$users = elgg_get_entities_from_relationship($options);
 				if (!empty($users)) {
 					$new_users = array();
@@ -246,13 +246,13 @@ function newsletter_process($entity_guid) {
 					$filtered_recipients["users"] += $new_users;
 				}
 			}
-			
+
 			$emails = elgg_extract("emails", $recipients);
 			if (!empty($emails)) {
 				if (!is_array($emails)) {
 					$emails = array($emails);
 				}
-				
+
 				// get blocked users
 				$options = array(
 					"type" => "user",
@@ -274,17 +274,17 @@ function newsletter_process($entity_guid) {
 					),
 					"callback" => "newsletter_user_row_to_subscriber_info"
 				);
-				
+
 				$users = elgg_get_entities($options);
 				if (!empty($users)) {
 					$blocked_emails = array();
 					foreach ($users as $user) {
 						$blocked_emails[] = $user["email"];
 					}
-					
+
 					$emails = array_diff($emails, $blocked_emails);
 				}
-				
+
 				if (!empty($emails)) {
 					// get blocked emails
 					$options = array(
@@ -308,23 +308,23 @@ function newsletter_process($entity_guid) {
 						),
 						"callback" => "newsletter_user_row_to_subscriber_info"
 					);
-					
+
 					$subscriptions = elgg_get_entities($options);
 					if (!empty($subscriptions)) {
 						$blocked_emails = array();
 						foreach ($subscriptions as $subscription) {
 							$blocked_emails[] = $subscription["email"];
 						}
-						
+
 						$emails = array_diff($emails, $blocked_emails);
 					}
-					
+
 					if (!empty($emails)) {
 						$filtered_recipients["emails"] = array_merge($filtered_recipients["emails"], $emails);
 					}
 				}
 			}
-			
+
 			// ======================
 			// get newsletter content
 			// ======================
@@ -334,11 +334,11 @@ function newsletter_process($entity_guid) {
 				$message_subject = elgg_echo("newsletter:subject", array($container->name, $entity->title));
 			}
 			$message_plaintext_content = elgg_echo("newsletter:plain_message", array(elgg_normalize_url($entity->getURL())));
-			
+
 			$message_html_content = elgg_view_layout("newsletter", array("entity" => $entity));
 			// convert to inline CSS for email clients
 			$message_html_content = html_email_handler_css_inliner($message_html_content);
-			
+
 			// =======================
 			// proccess all recipients
 			// =======================
@@ -347,11 +347,11 @@ function newsletter_process($entity_guid) {
 				"subject" => $message_subject,
 				"plaintext_message" => $message_plaintext_content
 			);
-			
+
 			foreach ($filtered_recipients as $type => $recipients) {
-				
+
 				if (!empty($recipients)) {
-					
+
 					foreach ($recipients as $id => $recipient) {
 						$recipient_log = array(
 							"type" => $type,
@@ -360,61 +360,61 @@ function newsletter_process($entity_guid) {
 							"timestamp" => time(),
 							"status" => false
 						);
-						
+
 						// =============================================
 						// create individual footer for unsubscribe link
 						// =============================================
 						if ($type == "users") {
 							$recipient_log["guid"] = $id;
-							
+
 							$unsubscribe_link = newsletter_generate_unsubscribe_link($container, $id);
 						} else {
 							$unsubscribe_link = newsletter_generate_unsubscribe_link($container, $recipient);
 						}
-						
+
 						// place the unsubscribe link in the message
 						$unsubscribe_link = elgg_normalize_url($unsubscribe_link);
 						$message_html_content_user = str_ireplace(urlencode("{unsublink}"), $unsubscribe_link, $message_html_content);
-						
+
 						// replace the online link for logged out users to add an emailadres
 						if ($type !== "users") {
 							$online_link = $entity->getURL();
 							$new_online_link = $online_link . "?e=" . $recipient;
-							
+
 							$message_html_content_user = str_ireplace($online_link, $new_online_link, $message_html_content_user);
 						}
-						
+
 						// =========
 						// send mail
 						// =========
 						$send_options["to"] = $recipient;
 						$send_options["html_message"] = $message_html_content_user;
-						
+
 						$recipient_log["status"] = html_email_handler_send_email($send_options);
-						
+
 						if ($recipient_log["status"] && !empty($recipient_log["guid"])) {
 							$entity->addRelationship($recipient_log["guid"], Newsletter::SEND_TO);
 						}
-						
+
 						// ==============
 						// add to logging
 						// ==============
 						$logging["recipients"][] = $recipient_log;
-						
+
 						$entity->saveLogging($logging);
 					}
 				}
 			}
-			
+
 			$logging["end_time"] = time();
-			
+
 			$entity->saveLogging($logging);
-			
+
 			// =============================
 			// set newsletter status to done
 			// =============================
 			$entity->status = "sent";
-			
+
 			// ========================
 			// send status notification
 			// ========================
@@ -422,11 +422,11 @@ function newsletter_process($entity_guid) {
 				$from = html_email_handler_make_rfc822_address($site);
 				$subject = elgg_echo("newsletter:status_notification:subject");
 				$message = elgg_echo("newsletter:status_notification:message", array($entity->title, $entity->getURL()));
-				
+
 				elgg_send_email($from, $entity->status_notification, $subject, $message);
 			}
 		}
-		
+
 		// restore access
 		elgg_set_ignore_access($ia);
 	}
@@ -445,23 +445,23 @@ function newsletter_process($entity_guid) {
  */
 function newsletter_format_recipient($recipient) {
 	$result = false;
-	
+
 	if (!empty($recipient)) {
 		if (elgg_instanceof($recipient, "user")) {
 			$icon = elgg_view_entity_icon($recipient, "tiny", array(
 				"use_hover" => false,
 				"use_link" => false
 			));
-			
+
 			// label for autoselect listing
 			$label = elgg_view_image_block($icon, $recipient->name, array("class" => "elgg-autocomplete-item"));
-			
+
 			// content for if selected
 			$content = "<div class='newsletter-recipient-result phs'>";
 			$content .= elgg_view("input/hidden", array("name" => "user_guids[]", "value" => $recipient->getGUID()));
 			$content .= elgg_view_image_block($icon, $recipient->name, array("image_alt" => elgg_view_icon("delete-alt")));
 			$content .= "</div>";
-			
+
 			$result = array(
 				"type" => "user",
 				"value" => $recipient->getGUID(),
@@ -473,22 +473,22 @@ function newsletter_format_recipient($recipient) {
 				"use_hover" => false,
 				"href" => false
 			));
-			
+
 			// label for autoselect listing
 			$name = "<span>" . elgg_echo("groups:group") . ": </span>" . $recipient->name;
 			$name .= "<span class='elgg-quiet'> (" . $recipient->getMembers(0, 0, true) . " " . elgg_echo("groups:member") . ")</span>";
-			
+
 			$label = elgg_view_image_block($icon, $name, array("class" => "elgg-autocomplete-item newsletter-recipient-autocomplete-group"));
-			
+
 			// content for if selected
 			$name = $recipient->name;
 			$name .= "<span class='elgg-quiet'> (" . $recipient->getMembers(0, 0, true) . " " . elgg_echo("groups:member") . ")</span>";
-			
+
 			$content = "<div class='newsletter-recipient-result phs'>";
 			$content .= elgg_view("input/hidden", array("name" => "group_guids[]", "value" => $recipient->getGUID()));
 			$content .= elgg_view_image_block($icon, $name, array("image_alt" => elgg_view_icon("delete-alt")));
 			$content .= "</div>";
-			
+
 			$result = array(
 				"type" => "group",
 				"value" => $recipient->getGUID(),
@@ -498,12 +498,12 @@ function newsletter_format_recipient($recipient) {
 		} elseif (newsletter_is_email_address($recipient)) {
 			$name = "<span>" . elgg_echo("newsletter:recipients:email") . ": </span>" . $recipient;
 			$label = elgg_view_image_block("", $name, array("class" => "elgg-autocomplete-item newsletter-recipient-autocomplete-email"));
-				
+
 			$content = "<div class='newsletter-recipient-result phs'>";
 			$content .= elgg_view("input/hidden", array("name" => "emails[]", "value" => $recipient));
 			$content .= elgg_view_image_block("", $recipient, array("image_alt" => elgg_view_icon("delete-alt")));
 			$content .= "</div>";
-				
+
 			$result = array(
 				"type" => "email",
 				"label" => $label,
@@ -511,7 +511,7 @@ function newsletter_format_recipient($recipient) {
 			);
 		}
 	}
-	
+
 	return $result;
 }
 
@@ -525,7 +525,7 @@ function newsletter_format_recipient($recipient) {
  */
 function newsletter_get_subscribers(ElggEntity $container, $count = false) {
 	$result = false;
-	
+
 	if (!empty($container) && (elgg_instanceof($container, "site") || elgg_instanceof($container, "group"))) {
 		// get the subscribers
 		if (!$count) {
@@ -533,7 +533,7 @@ function newsletter_get_subscribers(ElggEntity $container, $count = false) {
 				"users" => array(),
 				"emails" => array()
 			);
-			
+
 			// get all subscribed community members
 			$options = array(
 				"type" => "user",
@@ -546,7 +546,7 @@ function newsletter_get_subscribers(ElggEntity $container, $count = false) {
 				"joins" => array("JOIN " . elgg_get_config("dbprefix") . "users_entity ue ON e.guid = ue.guid"),
 				"callback" => "newsletter_user_row_to_subscriber_info"
 			);
-			
+
 			// @todo make this easier????
 			$tmp_users = elgg_get_entities_from_relationship($options);
 			if (!empty($tmp_users)) {
@@ -554,7 +554,7 @@ function newsletter_get_subscribers(ElggEntity $container, $count = false) {
 					$result["users"][$tmp_user["guid"]] = $tmp_user["email"];
 				}
 			}
-			
+
 			// check the email subscriptions
 			$options = array(
 				"type" => "object",
@@ -567,7 +567,7 @@ function newsletter_get_subscribers(ElggEntity $container, $count = false) {
 				"joins" => array("JOIN " . elgg_get_config("dbprefix") . "objects_entity oe ON e.guid = oe.guid"),
 				"callback" => "newsletter_subscription_row_to_subscriber_info"
 			);
-			
+
 			$result["emails"] = elgg_get_entities_from_relationship($options);
 		} else {
 			// get all subscribed community members
@@ -579,9 +579,9 @@ function newsletter_get_subscribers(ElggEntity $container, $count = false) {
 				"relationship_guid" => $container->getGUID(),
 				"inverse_relationship" => true
 			);
-			
+
 			$result = elgg_get_entities_from_relationship($options);
-			
+
 			// check the email subscriptions
 			$options = array(
 				"type" => "object",
@@ -591,11 +591,11 @@ function newsletter_get_subscribers(ElggEntity $container, $count = false) {
 				"relationship_guid" => $container->getGUID(),
 				"inverse_relationship" => true,
 			);
-			
+
 			$result += elgg_get_entities_from_relationship($options);
 		}
 	}
-	
+
 	return $result;
 }
 
@@ -609,7 +609,7 @@ function newsletter_get_subscribers(ElggEntity $container, $count = false) {
  */
 function newsletter_check_user_subscription(ElggUser $user, ElggEntity $entity) {
 	$result = false;
-	
+
 	if (!empty($user) && !empty($entity)) {
 		if (elgg_instanceof($user, "user") && (elgg_instanceof($entity, "site") || elgg_instanceof($entity, "group"))) {
 			// include all users
@@ -622,7 +622,7 @@ function newsletter_check_user_subscription(ElggUser $user, ElggEntity $entity) 
 			}
 		}
 	}
-	
+
 	return $result;
 }
 
@@ -636,7 +636,7 @@ function newsletter_check_user_subscription(ElggUser $user, ElggEntity $entity) 
  */
 function newsletter_subscribe_user(ElggUser $user, ElggEntity $entity) {
 	$result = false;
-	
+
 	if (!empty($user) && !empty($entity)) {
 		if (elgg_instanceof($user, "user") && (elgg_instanceof($entity, "site") || elgg_instanceof($entity, "group"))) {
 			// check if subscribed
@@ -646,23 +646,23 @@ function newsletter_subscribe_user(ElggUser $user, ElggEntity $entity) {
 			} else {
 				$result = true;
 			}
-			
+
 			// remove blocklist relation
 			remove_entity_relationship($user->getGUID(), NewsletterSubscription::BLACKLIST, $entity->getGUID());
-			
+
 			// remove general blocklist
 			$site = elgg_get_site_entity();
 			remove_entity_relationship($user->getGUID(), NewsletterSubscription::GENERAL_BLACKLIST, $site->getGUID());
-			
+
 			// check if on email blacklist
 			$subscription = newsletter_get_subscription($user->email);
-			
+
 			if (!empty($subscription)) {
 				$subscription->removeRelationship($entity, NewsletterSubscription::BLACKLIST);
 			}
 		}
 	}
-	
+
 	return $result;
 }
 
@@ -676,40 +676,44 @@ function newsletter_subscribe_user(ElggUser $user, ElggEntity $entity) {
  */
 function newsletter_subscribe_email($email, ElggEntity $entity) {
 	$result = false;
-	
+
 	if (!empty($email) && !empty($entity)) {
 		if (newsletter_is_email_address($email) && (elgg_instanceof($entity, "site") || elgg_instanceof($entity, "group"))) {
 			// check if email belongs to existing user
 			$users = get_user_by_email($email);
-			
+
 			if (!empty($users)) {
 				$result = newsletter_subscribe_user($users[0], $entity);
 			} else {
 				// check if email address exists in the system
 				$subscription = newsletter_get_subscription($email);
-				
+
+				if (!empty($subscription)) {
+					return 'exists';
+				}
+
 				if (empty($subscription)) {
 					$subscription = new NewsletterSubscription();
 					$subscription->title = $email;
-					
+
 					if (!$subscription->save()) {
 						return false;
 					}
 				}
-				
+
 				// subscribe
 				$result = (bool) $subscription->addRelationship($entity->getGUID(), NewsletterSubscription::SUBSCRIPTION);
-				
+
 				// remove blocklist relation
 				remove_entity_relationship($subscription->getGUID(), NewsletterSubscription::BLACKLIST, $entity->getGUID());
-				
+
 				// remove general blocklist
 				$site = elgg_get_site_entity();
 				remove_entity_relationship($subscription->getGUID(), NewsletterSubscription::GENERAL_BLACKLIST, $site->getGUID());
 			}
 		}
 	}
-	
+
 	return $result;
 }
 
@@ -723,19 +727,19 @@ function newsletter_subscribe_email($email, ElggEntity $entity) {
  */
 function newsletter_unsubscribe_user(ElggUser $user, ElggEntity $entity) {
 	$result = false;
-	
+
 	if (!empty($user) && !empty($entity)) {
 		if (elgg_instanceof($user, "user") && (elgg_instanceof($entity, "site") || elgg_instanceof($entity, "group"))) {
 			// remove subscription
 			remove_entity_relationship($user->getGUID(), NewsletterSubscription::SUBSCRIPTION, $entity->getGUID());
-			
+
 			// check if on email subscriptionlist
 			$subscription = newsletter_get_subscription($user->email);
-			
+
 			if (!empty($subscription)) {
 				$subscription->removeRelationship($entity->getGUID(), NewsletterSubscription::SUBSCRIPTION);
 			}
-	
+
 			// check if blocked
 			if (!check_entity_relationship($user->getGUID(), NewsletterSubscription::BLACKLIST, $entity->getGUID())) {
 				// not yet, so add
@@ -745,7 +749,7 @@ function newsletter_unsubscribe_user(ElggUser $user, ElggEntity $entity) {
 			}
 		}
 	}
-	
+
 	return $result;
 }
 
@@ -759,37 +763,37 @@ function newsletter_unsubscribe_user(ElggUser $user, ElggEntity $entity) {
  */
 function newsletter_unsubscribe_email($email, ElggEntity $entity) {
 	$result = false;
-	
+
 	if (!empty($email) && !empty($entity)) {
 		if (newsletter_is_email_address($email) && (elgg_instanceof($entity, "site") || elgg_instanceof($entity, "group"))) {
 			// check if not existing user
 			$users = get_user_by_email($email);
-			
+
 			if (!empty($users)) {
 				// existing user
 				$result = newsletter_unsubscribe_user($users[0], $entity);
 			} else {
 				// email address
 				$subscription = newsletter_get_subscription($email);
-				
+
 				if (empty($subscription)) {
 					$subscription = new NewsletterSubscription();
 					$subscription->title = $email;
-					
+
 					if (!$subscription->save()) {
 						return false;
 					}
 				}
-				
+
 				// remove existing subscription (if any)
 				$subscription->removeRelationship($entity->getGUID(), NewsletterSubscription::SUBSCRIPTION);
-				
+
 				// add to blocked list
 				$result = $subscription->addRelationship($entity->getGUID(), NewsletterSubscription::BLACKLIST);
 			}
 		}
 	}
-	
+
 	return $result;
 }
 
@@ -848,13 +852,13 @@ function newsletter_row_to_guid($row) {
  */
 function newsletter_is_email_address($address) {
 	$result = false;
-	
+
 	if (!empty($address)) {
 		$regexpr = "/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/";
-		
+
 		$result = (bool) preg_match($regexpr, $address);
 	}
-	
+
 	return $result;
 }
 
@@ -868,13 +872,13 @@ function newsletter_is_email_address($address) {
  */
 function newsletter_generate_unsubscribe_link(ElggEntity $container, $recipient) {
 	$result = false;
-	
+
 	if (!empty($container) && (elgg_instanceof($container, "site") || elgg_instanceof($container, "group"))) {
 		$result = "newsletter/unsubscribe/" . $container->getGUID();
-		
+
 		if (!empty($recipient)) {
 			$code = newsletter_generate_unsubscribe_code($container, $recipient);
-			
+
 			if (is_numeric($recipient)) {
 				// recipient is an user_guid
 				$result .= "?u=" . $recipient . "&c=" . $code;
@@ -883,10 +887,10 @@ function newsletter_generate_unsubscribe_link(ElggEntity $container, $recipient)
 				$result .= "?e=" . $recipient . "&c=" . $code;
 			}
 		}
-		
+
 		$result = elgg_normalize_url($result);
 	}
-	
+
 	return $result;
 }
 
@@ -900,16 +904,16 @@ function newsletter_generate_unsubscribe_link(ElggEntity $container, $recipient)
  */
 function newsletter_generate_unsubscribe_code(ElggEntity $container, $recipient) {
 	$result = false;
-	
+
 	if (!empty($container) && (elgg_instanceof($container, "site") || elgg_instanceof($container, "group")) && !empty($recipient)) {
 		// make sure we have a user_guid or email address
 		if (is_numeric($recipient) || newsletter_is_email_address($recipient)) {
 			$plugin = elgg_get_plugin_from_id("newsletter");
-			
+
 			$result = hash_hmac("sha256", ($container->getGUID() . "|" . $recipient . "|" . $plugin->time_created), get_site_secret());
 		}
 	}
-	
+
 	return $result;
 }
 
@@ -924,20 +928,20 @@ function newsletter_generate_unsubscribe_code(ElggEntity $container, $recipient)
  */
 function newsletter_validate_unsubscribe_code(ElggEntity $container, $recipient, $code) {
 	$result = false;
-	
+
 	if (!empty($container) && (elgg_instanceof($container, "site") || elgg_instanceof($container, "group")) && !empty($recipient)) {
 		// make sure we have a user_guid or email address
 		if (is_numeric($recipient) || newsletter_is_email_address($recipient)) {
 			// generate the code as it should be
 			$correct_code = newsletter_generate_unsubscribe_code($container, $recipient);
-			
+
 			// check for a match
 			if ($code === $correct_code) {
 				$result = true;
 			}
 		}
 	}
-	
+
 	return $result;
 }
 
@@ -950,11 +954,11 @@ function newsletter_validate_unsubscribe_code(ElggEntity $container, $recipient,
  */
 function newsletter_get_subscription($email) {
 	$result = false;
-	
+
 	if (!empty($email) && newsletter_is_email_address($email)) {
 		// ignore access
 		$ia = elgg_set_ignore_access(true);
-		
+
 		$options = array(
 			"type" => "object",
 			"subtype" => NewsletterSubscription::SUBTYPE,
@@ -962,17 +966,17 @@ function newsletter_get_subscription($email) {
 			"joins" => array("JOIN " . elgg_get_config("dbprefix") . "objects_entity oe ON e.guid = oe.guid"),
 			"wheres" => array("(oe.title = '" . sanitise_string($email) . "')")
 		);
-		
+
 		$entities = elgg_get_entities($options);
-		
+
 		if (!empty($entities)) {
 			$result = $entities[0];
 		}
-		
+
 		// restore access
 		elgg_set_ignore_access($ia);
 	}
-	
+
 	return $result;
 }
 
@@ -985,12 +989,12 @@ function newsletter_get_subscription($email) {
  */
 function newsletter_unsubscribe_all_user(ElggUser $user) {
 	$result = false;
-	
+
 	if (!empty($user) && elgg_instanceof($user, "user")) {
 		$site = elgg_get_site_entity();
 		// remove site subscription
 		remove_entity_relationship($user->getGUID(), NewsletterSubscription::SUBSCRIPTION, $site->getGUID());
-		
+
 		// remove all subscriptions
 		$options = array(
 			"type" => "group",
@@ -999,26 +1003,26 @@ function newsletter_unsubscribe_all_user(ElggUser $user) {
 			"relationship_guid" => $user->getGUID(),
 			"callback" => "newsletter_row_to_guid"
 		);
-		
+
 		$entities = elgg_get_entities_from_relationship($options);
-		
+
 		if (!empty($entities)) {
 			foreach ($entities as $entity_guid) {
 				remove_entity_relationship($user->getGUID(), NewsletterSubscription::SUBSCRIPTION, $entity_guid);
 			}
 		}
-		
+
 		// add to general blacklist
 		$result = (bool) add_entity_relationship($user->getGUID(), NewsletterSubscription::GENERAL_BLACKLIST, $site->getGUID());
-		
+
 		// remove email subscriptions (if any)
 		$subscription = newsletter_get_subscription($user->email);
-		
+
 		if (!empty($subscription)) {
 			$subscription->delete();
 		}
 	}
-	
+
 	return $result;
 }
 
@@ -1031,29 +1035,29 @@ function newsletter_unsubscribe_all_user(ElggUser $user) {
  */
 function newsletter_unsubscribe_all_email($email) {
 	$result = false;
-	
+
 	if (!empty($email) && newsletter_is_email_address($email)) {
 		// get subscription
 		$subscription = newsletter_get_subscription($email);
-		
+
 		if (empty($subscription)) {
 			$subscription = new NewsletterSubscription();
 			$subscription->title = $email;
-			
+
 			if (!$subscription->save()) {
 				return false;
 			}
-			
+
 			// remove all existing subscriptions
 			remove_entity_relationships($subscription->getGUID(), NewsletterSubscription::SUBSCRIPTION);
-			
+
 			// add to general blacklist
 			$site = elgg_get_site_entity();
-				
+
 			$result = (bool) add_entity_relationship($subscription->getGUID(), NewsletterSubscription::GENERAL_BLACKLIST, $site->getGUID());
 		}
 	}
-	
+
 	return $result;
 }
 
@@ -1067,7 +1071,7 @@ function newsletter_unsubscribe_all_email($email) {
  */
 function newsletter_convert_subscription_to_user_setting(NewsletterSubscription $subscription, ElggUser $user) {
 	$result = false;
-	
+
 	if (!empty($subscription) && elgg_instanceof($subscription, "object", NewsletterSubscription::SUBTYPE) && !empty($user) && elgg_instanceof($user, "user")) {
 		// check global block list
 		$site = elgg_get_site_entity();
@@ -1077,27 +1081,27 @@ function newsletter_convert_subscription_to_user_setting(NewsletterSubscription 
 		} else {
 			// check for subscriptions
 			$subscriptions = $subscription->getEntitiesFromRelationship(NewsletterSubscription::SUBSCRIPTION, false, false);
-				
+
 			if (!empty($subscriptions)) {
 				foreach ($subscriptions as $entity) {
 					newsletter_subscribe_user($user, $entity);
 				}
 			}
-				
+
 			// check for blocks
 			$blocked = $subscription->getEntitiesFromRelationship(NewsletterSubscription::BLACKLIST, false, false);
-				
+
 			if (!empty ($blocked)) {
 				foreach ($blocked as $entity) {
 					newsletter_unsubscribe_user($user, $entity);
 				}
 			}
 		}
-		
+
 		// remove email subscription
 		$result = (bool) $subscription->delete();
 	}
-	
+
 	return $result;
 }
 
@@ -1111,23 +1115,23 @@ function newsletter_convert_subscription_to_user_setting(NewsletterSubscription 
 function newsletter_is_group_enabled(ElggGroup $group = null) {
 	static $plugin_setting;
 	$result = false;
-	
+
 	// make sure we only get the plugin setting once
 	if (!isset($plugin_setting)) {
 		$plugin_setting = false;
-		
+
 		$setting = elgg_get_plugin_setting("allow_groups", "newsletter");
 		if ($setting == "yes") {
 			$plugin_setting = true;
 		}
 	}
-	
+
 	// check the setting of the group (if any)
 	if ($plugin_setting) {
 		if (!empty($group) && elgg_instanceof($group, "group")) {
 			// check the setting of the group
 			$group_setting = $group->newsletter_enable;
-			
+
 			if ($group_setting != "no") {
 				$result = true;
 			}
@@ -1136,7 +1140,7 @@ function newsletter_is_group_enabled(ElggGroup $group = null) {
 			$result = true;
 		}
 	}
-	
+
 	return $result;
 }
 
@@ -1150,10 +1154,10 @@ function newsletter_is_group_enabled(ElggGroup $group = null) {
  */
 function newsletter_send_preview(Newsletter $entity, $email) {
 	$result = false;
-	
+
 	if (!empty($entity) && elgg_instanceof($entity, "object", Newsletter::SUBTYPE) && !empty($email)) {
 		$container = $entity->getContainerEntity();
-		
+
 		// build correct subject
 		if ($entity->subject) {
 			$message_subject = $entity->subject;
@@ -1162,22 +1166,22 @@ function newsletter_send_preview(Newsletter $entity, $email) {
 		}
 		//  plaintext message
 		$message_plaintext_content = elgg_echo("newsletter:plain_message", array($entity->getURL()));
-		
+
 		// html content
 		$message_html_content = elgg_view_layout("newsletter", array("entity" => $entity));
 		// convert to inline CSS for email clients
 		$message_html_content = html_email_handler_css_inliner($message_html_content);
-		
+
 		// add unsubscribe link
 		$unsubscribe_link = newsletter_generate_unsubscribe_link($container, $email);
 		$message_html_content = str_ireplace(urlencode("{unsublink}"), $unsubscribe_link, $message_html_content);
-		
+
 		// replace online link
 		$online_link = $entity->getURL();
 		$new_online_link = $online_link . "?e=" . $email;
-		
+
 		$message_html_content = str_ireplace($online_link, $new_online_link, $message_html_content);
-		
+
 		// start creating sending options
 		$send_options = array(
 			"from" => html_email_handler_make_rfc822_address($container),
@@ -1186,11 +1190,11 @@ function newsletter_send_preview(Newsletter $entity, $email) {
 			"to" => $email,
 			"html_message" => $message_html_content
 		);
-		
+
 		// send preview
 		$result = html_email_handler_send_email($send_options);
 	}
-	
+
 	return $result;
 }
 
@@ -1201,16 +1205,16 @@ function newsletter_send_preview(Newsletter $entity, $email) {
  */
 function newsletter_include_existing_users() {
 	static $result;
-	
+
 	if (!isset($result)) {
 		$result = true;
-		
+
 		$setting = elgg_get_plugin_setting("include_existing_users", "newsletter");
 		if ($setting == "no") {
 			$result = false;
 		}
 	}
-	
+
 	return $result;
 }
 
@@ -1226,31 +1230,31 @@ function newsletter_include_existing_users() {
  */
 function newsletter_get_available_templates($container_guid) {
 	$result = array();
-	
+
 	// detect templates provided by themes/plugins
 	$views = elgg_get_config("views");
 	$locations = $views->locations["default"];
 	$keys = array_keys($locations);
-	
+
 	$pattern = '/^newsletter\/templates\/(?P<name>\w+)\/(body|css)$/';
-	
+
 	foreach ($keys as $view) {
 		$matches = array();
 		$res = preg_match($pattern, $view, $matches);
-		
+
 		if ($res) {
 			$name = elgg_extract("name", $matches);
 			$lan_key = "newsletter:edit:template:select:" . $name;
 			$title = elgg_echo($lan_key);
-			
+
 			if ($title == $lan_key) {
 				$title = $name;
 			}
-			
+
 			$result[$name] = $title;
 		}
 	}
-	
+
 	// get saved templates
 	if (!empty($container_guid)) {
 		$options = array(
@@ -1259,7 +1263,7 @@ function newsletter_get_available_templates($container_guid) {
 			"container_guid" => $container_guid,
 			"limit" => false
 		);
-		
+
 		$templates = elgg_get_entities($options);
 		if (!empty($templates)) {
 			foreach ($templates as $template) {
@@ -1267,11 +1271,11 @@ function newsletter_get_available_templates($container_guid) {
 			}
 		}
 	}
-	
+
 	// the custom selection option
 	unset($result["custom"]); // make sure custom is last in the list (shouldn't be provided by a plugin/theme)
 	$result["custom"] = elgg_echo("newsletter:edit:template:select:custom");
-	
+
 	return $result;
 }
 
@@ -1287,15 +1291,15 @@ function newsletter_get_available_templates($container_guid) {
  * @return array
  */
 function newsletter_process_csv_upload(array $recipients) {
-	
+
 	// is a file uploaded
 	if (get_uploaded_file("csv")) {
 		// open the file as CSV
 		$fh = fopen($_FILES["csv"]["tmp_name"], "r");
-		
+
 		if (!empty($fh)) {
 			$email_column = false;
-			
+
 			// try to find an email column (in the first 2 rows)
 			for ($i = 0; $i < 2; $i++) {
 				$row = fgetcsv($fh, null, ";", "\"");
@@ -1308,30 +1312,30 @@ function newsletter_process_csv_upload(array $recipients) {
 					}
 				}
 			}
-			
+
 			// found an email column
 			if ($email_column !== false) {
 				$counter = 0;
-				
+
 				// start at the beginning
 				if (rewind($fh)) {
 					$row = fgetcsv($fh, null, ";", "\"");
 					while ($row !== false) {
 						// get the email address
 						$email = @$row[$email_column];
-						
+
 						// make sure it's a valid email address
 						if (newsletter_is_email_address($email)) {
 							$counter++;
 							$exists = false;
-							
+
 							// is this email address already in the recipients list
 							if (in_array($email, $recipients["emails"])) {
 								$exists = true;
 							} else {
 								// check for an existing user
 								$ia = elgg_set_ignore_access(true);
-								
+
 								$users = get_user_by_email($email);
 								if (!empty($users)) {
 									foreach ($users as $user) {
@@ -1340,30 +1344,30 @@ function newsletter_process_csv_upload(array $recipients) {
 										}
 									}
 								}
-								
+
 								elgg_set_ignore_access($ia);
 							}
-							
+
 							if ($exists === false) {
 								// email address wasn't added yet
 								// so add to the list
 								$ia = elgg_set_ignore_access(true);
-								
+
 								$users = get_user_by_email($email);
 								if (!empty($users)) {
 									$recipients["user_guids"][] = $users[0]->getGUID();
 								} else {
 									$recipients["emails"][] = $email;
 								}
-								
+
 								elgg_set_ignore_access($ia);
 							}
 						}
-						
+
 						// go to the next row
 						$row = fgetcsv($fh, null, ";", "\"");
 					}
-					
+
 					// done, report the added emails
 					system_message(elgg_echo("newsletter:csv:added", array($counter)));
 				}
@@ -1373,6 +1377,6 @@ function newsletter_process_csv_upload(array $recipients) {
 			}
 		}
 	}
-	
+
 	return $recipients;
 }

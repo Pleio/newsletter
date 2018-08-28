@@ -165,6 +165,7 @@ Om de nieuwsbrief te bekijken klik hier:
   'newsletter:action:template:success' => 'Sjabloon opgeslagen',
   'newsletter:action:template_to_custom:success' => 'Sjabloon gekopieerd naar aangepast sjabloon',
   'newsletter:action:subscribe:error:subscribe' => 'Er is een fout opgetreden tijdens het abonneren, probeer het nogmaals',
+  'newsletter:action:subscribe:error:exists' => 'U heeft zich al aangemeld voor de nieuwsbrief',
   'newsletter:action:subscribe:error:unsubscribe' => 'Er is een fout opgetreden tijdens het uitschrijven, probeer het nogmaals',
   'newsletter:action:subscribe:success' => 'Je hebt je succesvol geabonneerd op de nieuwsbrief',
   'newsletter:action:subscribe:success:unsubscribe' => 'Je heb je succesvol uitgeschreven van de nieuwsbrief',

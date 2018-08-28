@@ -6,12 +6,12 @@ $email = get_input("email");
 
 if (!empty($guid) && (!empty($user_guid) || !empty($email))) {
 	$entity = get_entity($guid);
-	
+
 	if (elgg_instanceof($entity, "site") || elgg_instanceof($entity, "group")) {
 		if (!empty($user_guid)) {
 			// check the user
 			$user = get_user($user_guid);
-			
+
 			if (!empty($user) && $user->canEdit()) {
 				// is the user subscribed
 				if (newsletter_check_user_subscription($user, $entity)) {
@@ -34,8 +34,11 @@ if (!empty($guid) && (!empty($user_guid) || !empty($email))) {
 			}
 		} else {
 			if (newsletter_is_email_address($email)) {
+				if (newsletter_subscribe_email($email, $entity) == 'exists') {
+					register_error(elgg_echo("newsletter:action:subscribe:error:exists"));
+				}
 				// add the email address to the subscriber list
-				if (newsletter_subscribe_email($email, $entity)) {
+				elseif (newsletter_subscribe_email($email, $entity)) {
 					system_message(elgg_echo("newsletter:action:subscribe:success"));
 				} else {
 					register_error(elgg_echo("newsletter:action:subscribe:error:subscribe"));
