@@ -34,7 +34,7 @@ if (!empty($guid) && (!empty($user_guid) || !empty($email))) {
 			}
 		} else {
 			if (newsletter_is_email_address($email)) {
-				if (newsletter_subscribe_email($email, $entity) == 'exists') {
+				if (newsletter_subscribe_email($email, $entity) === 'exists') {
 					register_error(elgg_echo("newsletter:action:subscribe:error:exists"));
 				}
 				// add the email address to the subscriber list
