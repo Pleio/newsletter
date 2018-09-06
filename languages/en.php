@@ -1,6 +1,8 @@
 <?php
 
 	$english = array(
+		'admin:administer_utilities:newsletter_exporter' => "Newsletter Exporter",
+		'admin:administer_utilities:newsletter_exporter:export_subscribers' => "Export subscribers newsletter ",
 		// general
 		'item:object:newsletter' => "Newsletter",
 		'item:object:newsletter_template' => "Newsletter template",

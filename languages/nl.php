@@ -1,5 +1,9 @@
 <?php
 $language = array (
+  'admin:administer_utilities:newsletter_exporter' => "Nieuwsbrief Exporter",
+  'admin:administer_utilities:newsletter_exporter:export_subscribers' => "Exporteer inschrijvers nieuwsbrief ",
+
+
   'newsletter:widget:subscribe:description' => 'Toon een widget om je snel aan te kunnen melden voor de nieuwsbrief',
   'newsletter:csv:no_email' => 'Er kon geen e-mail kolom worden gevonden in de eerste 2 regels van het CSV-bestand',
   'newsletter:csv:added' => '%s e-mail adressen toegevoegd vanuit het CSV-bestand',
