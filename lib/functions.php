@@ -681,17 +681,19 @@ function newsletter_subscribe_email($email, ElggEntity $entity) {
 		if (newsletter_is_email_address($email) && (elgg_instanceof($entity, "site") || elgg_instanceof($entity, "group"))) {
 			// check if email belongs to existing user
 			$users = get_user_by_email($email);
-			$subscription = newsletter_get_subscription($email);
-
-			if (!empty($subscription)) {
-				return 'exists';
-			}
 
 			if (!empty($users)) {
+				if (check_entity_relationship($users[0]->getGUID(), NewsletterSubscription::SUBSCRIPTION, $entity->getGUID())) {
+					return 'exists';
+				}
 				$result = newsletter_subscribe_user($users[0], $entity);
 			} else {
 				// check if email address exists in the system
+				$subscription = newsletter_get_subscription($email);
 
+				if (!empty($subscription)) {
+					return 'exists';
+				}
 
 				if (empty($subscription)) {
 					$subscription = new NewsletterSubscription();
